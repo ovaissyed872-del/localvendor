@@ -1,0 +1,186 @@
+// CUSTOMER front-end interaction + SocketIO realtime updates
+const API = 'http://localhost:5000';
+const socket = io(API);
+
+let state = {
+  lat: null, lng: null,
+  vendors: [],
+  selectedVendor: null,
+  products: [],
+  cart: []
+};
+
+const $ = id => document.getElementById(id);
+const showToast = (msg, ms=2200) => {
+  const t = $('toast'); t.textContent = msg; t.style.display='block'; setTimeout(()=>t.style.display='none', ms);
+};
+
+// fetch vendors near current location
+async function fetchVendors() {
+  const radius = $('radius').value;
+  try {
+    const q = state.lat && state.lng ? `?lat=${state.lat}&lon=${state.lng}&radius=${radius}` : `?radius=${radius}`;
+    const res = await fetch(API + '/vendors' + q);
+    const data = await res.json();
+    state.vendors = data.vendors;
+    renderVendors(state.vendors);
+  } catch (err) {
+    // fallback static
+    console.error(err); showToast('Could not reach API; using demo data');
+    state.vendors = [
+      {id:1,name:'GreenMart Grocers',distance:0.9,tags:['Grocery']},
+      {id:2,name:'Daily Bakery',distance:1.4,tags:['Bakery']},
+      {id:3,name:'PharmaPlus',distance:2.1,tags:['Pharmacy']}
+    ];
+    renderVendors(state.vendors);
+  }
+}
+
+function renderVendors(list) {
+  const container = $('vendorsList'); container.innerHTML='';
+  $('vendorsCount').textContent = list.length + ' shops';
+  list.forEach(v=>{
+    const card = document.createElement('div'); card.className='vendor-card';
+    card.innerHTML = `<div class="vendor-name">${v.name}</div><div class="small">${v.distance? v.distance+' km away':''}</div>
+      <div style="margin-top:10px"><button class="input" data-id="${v.id}">View products</button></div>`;
+    container.appendChild(card);
+  });
+  container.querySelectorAll('button').forEach(b=>b.addEventListener('click',(e)=>{
+    const id = +e.currentTarget.dataset.id; openVendor(id);
+  }));
+}
+
+async function openVendor(id) {
+  // request products
+  state.selectedVendor = state.vendors.find(v=>v.id===id) || {id};
+  try {
+    const res = await fetch(`${API}/vendors/${id}/products`);
+    const data = await res.json();
+    state.products = data.products;
+  } catch (err) {
+    state.products = []; showToast('Could not load products');
+  }
+  $('shopTitle').textContent = state.selectedVendor.name || 'Products';
+  $('productsSection').style.display = 'block';
+  window.scrollTo(0,0);
+  renderProducts(state.products);
+}
+
+function renderProducts(products) {
+  const container = $('productsList'); container.innerHTML='';
+  products.forEach(p=>{
+    const el = document.createElement('div'); el.className='product card';
+    el.innerHTML = `<img src="${p.img||'https://via.placeholder.com/80'}" alt="${p.name}">
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between"><div>${p.name}</div><div style="font-weight:700">₹${p.price}</div></div>
+        <div class="small">${p.stock>0? p.stock + ' available' : 'Out of stock'}</div>
+      </div>
+      <div><button class="input" data-id="${p.id}" ${p.stock>0 ? '' : 'disabled'}>Add</button></div>`;
+    container.appendChild(el);
+  });
+  container.querySelectorAll('button').forEach(b=>b.addEventListener('click',(e)=>{
+    const id = +e.currentTarget.dataset.id; addToCart(id);
+  }));
+}
+
+// Cart functions
+function addToCart(productId) {
+  const product = state.products.find(p=>p.id===productId);
+  if(!product){ showToast('Product not available'); return; }
+  const existing = state.cart.find(c=>c.id===product.id);
+  if(existing) existing.qty++;
+  else state.cart.push({...product, qty:1});
+  renderCart();
+  showToast('Added to cart');
+}
+
+function renderCart(){
+  const container = $('cartItems'); container.innerHTML='';
+  let subtotal = 0;
+  state.cart.forEach(i=>{
+    subtotal += i.price * i.qty;
+    const div = document.createElement('div');
+    div.style.display='flex'; div.style.justifyContent='space-between'; div.style.marginBottom='8px';
+    div.innerHTML = `<div><div style="font-weight:600">${i.name}</div><div class="small">₹${i.price} × ${i.qty}</div></div>
+      <div style="text-align:right">
+        <button data-id="${i.id}" class="input" style="margin-bottom:6px">−</button>
+        <button data-id="${i.id}" class="input">+</button>
+        <div><button data-id="${i.id}" style="margin-top:6px;background:transparent;border:none;color:#ef4444;cursor:pointer">Remove</button></div>
+      </div>`;
+    container.appendChild(div);
+  });
+  $('subtotal').textContent = '₹' + subtotal;
+  $('cartCount').textContent = state.cart.reduce((s,i)=>s+i.qty,0) + ' items';
+  container.querySelectorAll('button').forEach(b=>{
+    const id = +b.dataset.id;
+    if(b.textContent.trim()==='−') b.addEventListener('click',()=>changeQty(id,-1));
+    else if(b.textContent.trim()==='+') b.addEventListener('click',()=>changeQty(id,1));
+    else if(b.textContent.trim()==='Remove') b.addEventListener('click',()=>removeFromCart(id));
+  });
+}
+
+function changeQty(id, delta) {
+  const it = state.cart.find(i=>i.id===id);
+  if(!it) return;
+  it.qty += delta;
+  if(it.qty<=0) state.cart = state.cart.filter(x=>x.id!==id);
+  renderCart();
+}
+function removeFromCart(id) { state.cart = state.cart.filter(i=>i.id!==id); renderCart(); }
+
+async function checkout(){
+  if(state.cart.length===0){ showToast('Cart empty'); return; }
+  const payload = {
+    vendor_id: state.selectedVendor?.id || null,
+    items: state.cart.map(i=>({product_id:i.id, qty:i.qty})),
+    customer: {name: 'Demo User'}
+  };
+  try {
+    const res = await fetch(API + '/orders', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    if(!res.ok) throw new Error('Order failed');
+    const data = await res.json();
+    showToast('Order placed: ' + data.order_id);
+    state.cart = []; renderCart();
+  } catch (err) {
+    console.error(err); showToast('Order placed (demo).');
+    state.cart = []; renderCart();
+  }
+}
+
+// location
+$('locBtn').addEventListener('click', ()=>{
+  if(!navigator.geolocation){ showToast('Geolocation unsupported'); return; }
+  navigator.geolocation.getCurrentPosition(pos=>{
+    state.lat = pos.coords.latitude; state.lng = pos.coords.longitude;
+    showToast('Location acquired');
+    fetchVendors();
+  }, err=>{ showToast('Location denied'); });
+});
+
+$('backBtn').addEventListener('click', ()=>{
+  $('productsSection').style.display='none';
+});
+
+$('searchInput').addEventListener('input', (e)=>{
+  const q = e.target.value.toLowerCase();
+  const filtered = state.vendors.filter(v => v.name.toLowerCase().includes(q) || (v.tags && v.tags.join(',').toLowerCase().includes(q)));
+  renderVendors(filtered);
+});
+
+$('checkoutBtn').addEventListener('click', checkout);
+
+// realtime product updates
+socket.on('product_update', data=>{
+  // if product in current view, update stock display
+  if(state.products && state.products.length){
+    const p = state.products.find(x => x.id === data.product_id);
+    if(p){ p.stock = data.stock; renderProducts(state.products); showToast('Product updated'); }
+  }
+});
+
+// new order notifications (for customers not necessary, but for debug)
+socket.on('new_order', data => {
+  console.log('new order event', data);
+});
+
+fetchVendors(); renderCart();

@@ -1,0 +1,26 @@
+const API = 'http://localhost:5000';
+const $ = id => document.getElementById(id);
+
+async function loadVendors(){
+  try {
+    const res = await fetch(API + '/admin/vendors');
+    const data = await res.json();
+    const container = $('adminVendors'); container.innerHTML='';
+    data.vendors.forEach(v=>{
+      const div = document.createElement('div'); div.className='card';
+      div.innerHTML = `<div style="display:flex;justify-content:space-between"><div><strong>${v.name}</strong></div>
+        <div>${v.approved? 'Approved' : 'Pending'}</div></div>
+        <div style="margin-top:8px"><button data-id="${v.id}" class="approveBtn">Approve</button></div>`;
+      container.appendChild(div);
+    });
+    container.querySelectorAll('.approveBtn').forEach(b=>b.addEventListener('click', async (e)=>{
+      const id = +e.currentTarget.dataset.id;
+      await fetch(`${API}/admin/vendors/${id}/approve`, {method:'POST'});
+      loadVendors();
+    }));
+  } catch (err) {
+    console.error(err); alert('Failed to load vendors');
+  }
+}
+
+loadVendors();
