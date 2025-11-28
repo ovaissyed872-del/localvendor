@@ -1,0 +1,121 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from flask_socketio import SocketIO, emit
+from models import db, Vendor, Product, Order
+from math import radians, sin, cos, sqrt, atan2
+import json
+import os
+
+def create_app():
+    app = Flask(__name__)
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///marketplace.db'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    db.init_app(app)
+    return app
+
+app = create_app()
+CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+
+# Utility: Haversine distance (km)
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371.0
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat/2)**2 + cos(radians(lat1))*cos(radians(lat2))*sin(dlon/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    return R * c
+
+@app.route('/vendors', methods=['GET'])
+def get_vendors():
+    lat = request.args.get('lat', type=float)
+    lon = request.args.get('lon', type=float)
+    radius_km = float(request.args.get('radius', 5.0))
+    vendors = Vendor.query.filter_by(approved=True).all()
+    result = []
+    for v in vendors:
+        dist = None
+        if lat is not None and lon is not None and v.latitude is not None and v.longitude is not None:
+            dist = round(haversine(lat, lon, v.latitude, v.longitude), 2)
+        if dist is None or dist <= radius_km:
+            result.append({
+                'id': v.id,
+                'name': v.name,
+                'latitude': v.latitude,
+                'longitude': v.longitude,
+                'tags': v.tags.split(',') if v.tags else [],
+                'distance': dist
+            })
+    return jsonify({'vendors': result})
+
+@app.route('/vendors/<int:vendor_id>/products', methods=['GET'])
+def vendor_products(vendor_id):
+    prods = Product.query.filter_by(vendor_id=vendor_id).all()
+    arr = [{'id': p.id, 'name': p.name, 'price': p.price, 'stock': p.stock, 'img': p.img} for p in prods]
+    return jsonify({'products': arr})
+
+@app.route('/products/<int:product_id>', methods=['PUT'])
+def update_product(product_id):
+    payload = request.json
+    p = Product.query.get_or_404(product_id)
+    # allowed updates: stock, price, name, img
+    if 'stock' in payload:
+        p.stock = int(payload['stock'])
+    if 'price' in payload:
+        p.price = float(payload['price'])
+    if 'name' in payload:
+        p.name = payload['name']
+    if 'img' in payload:
+        p.img = payload['img']
+    db.session.commit()
+
+    # Broadcast product update to customers (real-time)
+    socketio.emit('product_update', {'product_id': p.id, 'stock': p.stock, 'vendor_id': p.vendor_id})
+    return jsonify({'ok': True, 'product': {'id': p.id, 'stock': p.stock}})
+
+@app.route('/orders', methods=['POST'])
+def create_order():
+    payload = request.json or {}
+    # Expecting {vendor_id, items: [{product_id, qty}], customer: {...}}
+    order = Order(vendor_id=payload.get('vendor_id'), status='received', data=json.dumps(payload))
+    db.session.add(order)
+    db.session.commit()
+
+    # Notify vendor channel via socket
+    socketio.emit('new_order', {'order_id': order.id, 'vendor_id': order.vendor_id, 'data': payload})
+    return jsonify({'order_id': order.id}), 201
+
+# Admin endpoints (simple)
+@app.route('/admin/vendors', methods=['GET'])
+def admin_vendors():
+    vlist = Vendor.query.all()
+    return jsonify({'vendors': [{'id':v.id,'name':v.name,'approved':v.approved} for v in vlist]})
+
+@app.route('/admin/vendors/<int:vendor_id>/approve', methods=['POST'])
+def approve_vendor(vendor_id):
+    v = Vendor.query.get_or_404(vendor_id)
+    v.approved = True
+    db.session.commit()
+    return jsonify({'ok': True})
+
+# WebSocket events
+@socketio.on('connect')
+def on_connect():
+    print('Client connected')
+
+@socketio.on('join_vendor_room')
+def on_join_vendor_room(data):
+    # data: {vendor_id}
+    vendor_id = data.get('vendor_id')
+    # Using simple room scheme
+    if vendor_id:
+        from flask_socketio import join_room
+        join_room(f'vendor_{vendor_id}')
+        emit('joined', {'room': f'vendor_{vendor_id}'})
+
+if __name__ == '__main__':
+    # ensure DB exists
+    db_path = os.path.join(os.path.dirname(__file__), 'marketplace.db')
+    if not os.path.exists(db_path):
+        print("Database not found. Run db_init.py to create and seed data.")
+    socketio.run(app, host='0.0.0.0', port=5000)

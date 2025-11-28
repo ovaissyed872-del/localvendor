@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hyperlocal Marketplace - Customer</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div><strong>Hyperlocal Marketplace</strong></div>
+      <div class="small">Find shops within 1–5 km</div>
+    </div>
+
+    <div style="height:12px"></div>
+
+    <div class="card topbar">
+      <input id="searchInput" class="input" placeholder="Search for products or shops" />
+      <button id="locBtn">Use my location</button>
+      <select id="radius" class="input" style="max-width:120px">
+        <option value="2">2 km</option>
+        <option value="5" selected>5 km</option>
+        <option value="10">10 km</option>
+      </select>
+    </div>
+
+    <div id="vendorsSection" class="card" style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between">
+        <h3 style="margin:0">Nearby Shops</h3>
+        <div id="vendorsCount" class="small">0 shops</div>
+      </div>
+      <div id="vendorsList" class="vendors"></div>
+    </div>
+
+    <div id="productsSection" class="card" style="margin-top:12px;display:none">
+      <div style="display:flex;justify-content:space-between;">
+        <h3 id="shopTitle" style="margin:0">Products</h3>
+        <div id="shopDistance" class="small"></div>
+      </div>
+      <div id="productsList" class="products"></div>
+      <div style="margin-top:10px">
+        <button id="backBtn" style="background:#fff;border:1px solid #e6eef3;color:#0f172a;padding:8px 12px;border-radius:8px">Back to shops</button>
+      </div>
+    </div>
+
+    <div id="toast" style="position:fixed;left:50%;transform:translateX(-50%);bottom:96px;background:#111;color:#fff;padding:10px 14px;border-radius:8px;display:none"></div>
+
+    <!-- Cart -->
+    <div class="card cart" id="cartCard">
+      <header style="display:flex;justify-content:space-between;padding:12px;">
+        <div style="font-weight:700">Your Cart</div>
+        <div id="cartCount" class="small">0 items</div>
+      </header>
+      <div class="items" id="cartItems" style="padding:12px"></div>
+      <div style="padding:12px;border-top:1px solid #eef2f7">
+        <div style="display:flex;justify-content:space-between"><div>Subtotal</div><div id="subtotal">₹0</div></div>
+        <button class="checkout" id="checkoutBtn">Checkout</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="js/customer.js"></script>
+</body>
+</html>

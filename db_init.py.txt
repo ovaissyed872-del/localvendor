@@ -1,0 +1,29 @@
+# Run to create DB and seed sample data
+from app import create_app, db
+from models import Vendor, Product
+import os
+
+app = create_app()
+app.app_context().push()
+
+# Drop all & recreate (for demo)
+db.drop_all()
+db.create_all()
+
+# Seed vendors
+v1 = Vendor(name='GreenMart Grocers', latitude=12.935, longitude=77.630, tags='Grocery', approved=True)
+v2 = Vendor(name='Daily Bakery', latitude=12.938, longitude=77.632, tags='Bakery', approved=True)
+v3 = Vendor(name='PharmaPlus', latitude=12.9365, longitude=77.628, tags='Pharmacy', approved=True)
+db.session.add_all([v1, v2, v3])
+db.session.commit()
+
+# Seed products
+p1 = Product(vendor_id=v1.id, name='Whole Milk 1L', price=55, stock=12, img='https://images.unsplash.com/photo-1582719478178-1a6d4b6c7b14')
+p2 = Product(vendor_id=v1.id, name='Eggs (6)', price=60, stock=0, img='https://images.unsplash.com/photo-1544025162-d76694265947')
+p3 = Product(vendor_id=v2.id, name='Sourdough Loaf', price=120, stock=5, img='https://images.unsplash.com/photo-1542831371-d531d36971e6')
+p4 = Product(vendor_id=v2.id, name='Croissant', price=45, stock=10, img='https://images.unsplash.com/photo-1563805042-7684c019e1cb')
+p5 = Product(vendor_id=v3.id, name='Paracetamol 500mg (10)', price=40, stock=20, img='https://images.unsplash.com/photo-1580281657525-4d3c9b1d7a3c')
+db.session.add_all([p1,p2,p3,p4,p5])
+db.session.commit()
+
+print("Database initialized and seeded.")

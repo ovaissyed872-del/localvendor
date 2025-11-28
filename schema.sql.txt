@@ -1,0 +1,27 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE vendors (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  latitude REAL,
+  longitude REAL,
+  tags TEXT,
+  approved INTEGER DEFAULT 1
+);
+
+CREATE TABLE products (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  vendor_id INTEGER,
+  name TEXT,
+  price REAL,
+  stock INTEGER DEFAULT 0,
+  img TEXT,
+  FOREIGN KEY (vendor_id) REFERENCES vendors(id)
+);
+
+CREATE TABLE orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  vendor_id INTEGER,
+  status TEXT,
+  data TEXT
+);

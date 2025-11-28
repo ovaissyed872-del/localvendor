@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Vendor Dashboard</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div><strong>Vendor Dashboard</strong></div>
+      <div class="small">Manage products & orders</div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <label>Vendor ID (use seeded vendor IDs e.g., 1,2,3)</label>
+      <input id="vendorId" class="input" placeholder="Enter vendor id" />
+      <button id="loadBtn">Load Dashboard</button>
+    </div>
+
+    <div id="dashboard" style="display:none">
+      <div class="card" style="margin-top:12px">
+        <h3>Products</h3>
+        <div id="productList" class="products"></div>
+        <div style="margin-top:10px">
+          <h4>Add Product</h4>
+          <input id="pName" class="input" placeholder="Name" />
+          <input id="pPrice" class="input" placeholder="Price" type="number" />
+          <input id="pStock" class="input" placeholder="Stock" type="number" />
+          <input id="pImg" class="input" placeholder="Image URL" />
+          <button id="addProductBtn">Add Product</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>Incoming Orders</h3>
+        <div id="ordersList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/vendor.js"></script>
+</body>
+</html>

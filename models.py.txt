@@ -1,0 +1,30 @@
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
+
+class Vendor(db.Model):
+    __tablename__ = 'vendors'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, nullable=False)
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    tags = db.Column(db.String)
+    approved = db.Column(db.Boolean, default=True)
+
+    products = db.relationship('Product', backref='vendor', lazy=True)
+
+class Product(db.Model):
+    __tablename__ = 'products'
+    id = db.Column(db.Integer, primary_key=True)
+    vendor_id = db.Column(db.Integer, db.ForeignKey('vendors.id'), nullable=False)
+    name = db.Column(db.String, nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    stock = db.Column(db.Integer, default=0)
+    img = db.Column(db.String, nullable=True)
+
+class Order(db.Model):
+    __tablename__ = 'orders'
+    id = db.Column(db.Integer, primary_key=True)
+    vendor_id = db.Column(db.Integer, nullable=True)
+    status = db.Column(db.String, default='received')  # received, accepted, preparing, out_for_del, delivered
+    data = db.Column(db.Text)  # JSON stringified payload
